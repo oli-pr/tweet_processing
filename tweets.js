@@ -1,4 +1,4 @@
-equire('dotenv-safe').config();
+require('dotenv-safe').config();
 var streamName = process.env.TWEET_STREAM_NAME;
 var Twitter = require('twitter');
 var AWS = require('aws-sdk');
