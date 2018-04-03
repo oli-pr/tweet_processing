@@ -1,8 +1,8 @@
-require('dotenv-safe').config();
-var tweetBucket = process.env.S3_TWEET_BUCKET;
+equire('dotenv-safe').config();
+var streamName = process.env.TWEET_STREAM_NAME;
 var Twitter = require('twitter');
 var AWS = require('aws-sdk');
-var s3 = new AWS.S3();
+var kinesis = new AWS.Kinesis({region : 'us-east-1'});
 var myKey = 'tweet';
 
 var client = new Twitter({
@@ -16,43 +16,28 @@ var client = new Twitter({
  * Stream statuses filtered by keyword
  * number of tweets per second depends on topic popularity
  **/
-client.stream('statuses/filter', {track: 'twitter'}, process_tweets);
+client.stream('statuses/filter', {track: 'twitter'}, sendToKinesis);
 
-function process_tweets(stream) {
-  stream.on('data', tweet);
-  stream.on('error', error);
-}
+function sendToKinesis(stream) {
+  console.log("In sendToKinesis");
+  var recordParams = {};
+  var partitionKey = 'partition';
 
-function tweet(message) {
-//  console.log(message);
-  if(message.hasOwnProperty('extended_entities')) {
-//    console.log(message.extended_entities);
-
-    if(message.extended_entities.hasOwnProperty('media')) {
-      var media = message.extended_entities.media;
-      for(index = 0; index < media.length; ++index) {
-        console.log(media[index].media_url);
-
-        var params = {Bucket: tweetBucket, Key: myKey, Body: JSON.stringify(message)};
-        s3.putObject(params, s3Callback);
+  stream.on('data', function(data) {
+    recordParams = {
+      Data: JSON.stringify(data),
+      PartitionKey: partitionKey,
+      StreamName: streamName
+    };
+    kinesis.putRecord(recordParams, function(err, data) {
+      if(err) {
+        console.log(err);
       }
-    }
-  }
-
-// console.log(message.source);
-
-}
-
-function s3Callback(err, data) {
-  if(err) {
-    console.log(err)
-  } else {
-    console.log("Uploaded");
-  }
-}
-
-function error(problem) {
-  console.log(error);
+      else {
+        console.log("Streamed");
+      }
+    });
+  });
 }
 
 
